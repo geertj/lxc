@@ -53,18 +53,9 @@ packages="fedora-release @core vim gcc gcc-c++ gdb net-tools tar dhclient
 yum -y --releasever=$version --nogpg --installroot="$root" \
     --disablerepo='*' --enablerepo=fedora install $packages
 
-# Some initial guest configuration (based on the host)
+# Some initial guest configuration
 hostname=`basename "$root"`
 echo "$hostname" > "$root/etc/hostname"
-uid=`getent passwd "$USERNAME" | awk -F: '{print $3}'`
-homedir=`getent passwd "$USERNAME" |awk -F: '{print $6}'`
-password=`getent shadow "$USERNAME" | awk -F: '{print $2}'`
-systemd-nspawn -D "$root" usermod -p "$password" root
-systemd-nspawn -D "$root" useradd "$USERNAME" -u "$uid" -p "$password"
-systemd-nspawn -D "$root" gpasswd -a "$USERNAME" wheel
-files=".ssh .ssh/authorized_keys .vimrc .bashrc .gitconfig .pypirc"
-tar cCf "$homedir" - --no-recursion $files | \
-    tar xvpCf "$root/home/$USERNAME" -
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=966807
 sed -i -e 's/^\(.*pam_loginuid.*\)$/#\1/' "$root/etc/pam.d/login"
@@ -87,3 +78,19 @@ WantedBy=multi-user.target
 EOM
 ln -s "/usr/lib/systemd/system/dhclient.service" \
     "$root/etc/systemd/system/multi-user.target.wants/dhclient.service"
+
+# Install some initial user configuration, if available
+if [ "$USERNAME" = "root" ]; then
+    USERNAME="$SUDO_USER"
+fi
+if [ "$USERNAME" != "root" ]; then
+    uid=`getent passwd "$USERNAME" | awk -F: '{print $3}'`
+    homedir=`getent passwd "$USERNAME" |awk -F: '{print $6}'`
+    password=`getent shadow "$USERNAME" | awk -F: '{print $2}'`
+    systemd-nspawn -D "$root" usermod -p "$password" root
+    systemd-nspawn -D "$root" useradd "$USERNAME" -u "$uid" -p "$password"
+    systemd-nspawn -D "$root" gpasswd -a "$USERNAME" wheel
+    files=".ssh .ssh/authorized_keys .vimrc .bashrc .gitconfig"
+    tar cCf "$homedir" - --no-recursion $files | \
+        tar xvpCf "$root/home/$USERNAME" -
+fi
