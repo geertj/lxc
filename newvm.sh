@@ -29,7 +29,9 @@ echo "$host" > "$root/etc/hostname"
 echo "HOSTNAME=$host" >> "$root/etc/sysconfig/network"
 
 tempxml=".template.xml.$$"
-sed -e "s,\$name,$host,g" -e "s,\$root,$root,g" < template.xml > "$tempxml"
+excpath=`readlink -f $0`
+template=`dirname "$excpath"`/template.xml
+sed -e "s,\$name,$host,g" -e "s,\$root,$root,g" < "$template" > "$tempxml"
 virsh -c lxc:/// define "$tempxml"
 virsh -c lxc:/// start "$host"
 rm -f "$tempxml"

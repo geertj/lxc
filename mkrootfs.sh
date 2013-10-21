@@ -71,13 +71,16 @@ Wants=network.target
 [Service]
 EnvironmentFile=/etc/sysconfig/network
 ExecStartPre=/bin/rm -f /var/run/dhclient.pid
-ExecStart=/sbin/dhclient -d eth0 -H $HOSTNAME
+ExecStart=/sbin/dhclient -d eth0 -H \$HOSTNAME
 
 [Install]
 WantedBy=multi-user.target
 EOM
 ln -s "/usr/lib/systemd/system/dhclient.service" \
     "$root/etc/systemd/system/multi-user.target.wants/dhclient.service"
+
+# updates
+systemd-nspawn -D "$root" yum update -y
 
 # Install some initial user configuration, if available
 if [ "$USERNAME" = "root" ]; then
@@ -87,10 +90,10 @@ if [ "$USERNAME" != "root" ]; then
     uid=`getent passwd "$USERNAME" | awk -F: '{print $3}'`
     homedir=`getent passwd "$USERNAME" |awk -F: '{print $6}'`
     password=`getent shadow "$USERNAME" | awk -F: '{print $2}'`
-    systemd-nspawn -D "$root" usermod -p "$password" root
-    systemd-nspawn -D "$root" useradd "$USERNAME" -u "$uid" -p "$password"
-    systemd-nspawn -D "$root" gpasswd -a "$USERNAME" wheel
-    files=".ssh .ssh/authorized_keys .vimrc .bashrc .gitconfig"
+    sleep 1 && systemd-nspawn -D "$root" usermod -p "$password" root
+    sleep 1 && systemd-nspawn -D "$root" useradd "$USERNAME" -m -u "$uid" \
+                -p "$password" -G wheel
+    files=".ssh .ssh/authorized_keys .bashrc"
     tar cCf "$homedir" - --no-recursion $files | \
         tar xvpCf "$root/home/$USERNAME" -
 fi
